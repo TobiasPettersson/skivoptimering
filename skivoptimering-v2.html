@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Träskiva-optimerare v2</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      color: #1a1a1a;
+      background: #f3f4f6;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1e3a5f;
+      color: #fff;
+      padding: 16px 24px;
+    }
+    header h1 { font-size: 20px; font-weight: 600; }
+    header p  { font-size: 13px; opacity: 0.75; margin-top: 2px; }
+
+    main {
+      display: grid;
+      grid-template-columns: 440px 1fr;
+      gap: 16px;
+      padding: 16px;
+      align-items: start;
+    }
+
+    @media (max-width: 1000px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    /* ── Kontrollpanel ── */
+    #controls { display: flex; flex-direction: column; gap: 12px; }
+
+    fieldset {
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+    legend {
+      font-weight: 600;
+      font-size: 13px;
+      color: #374151;
+      padding: 0 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .opt-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .opt-row label { color: #374151; cursor: pointer; font-size: 13px; }
+    #kerf-detail {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      margin-left: 26px;
+    }
+    #kerf-detail input { width: 70px; }
+    .unit { color: #9ca3af; font-size: 13px; }
+    .hint { font-size: 12px; color: #9ca3af; margin-top: 8px; line-height: 1.5; }
+
+    /* Tabeller i kontrollpanelen */
+    .grid-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13px;
+    }
+    .grid-table th {
+      text-align: left;
+      font-weight: 600;
+      color: #6b7280;
+      padding: 4px 4px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 12px;
+    }
+    .grid-table td { padding: 3px 3px; }
+    .grid-table input[type="number"],
+    .grid-table input[type="text"],
+    .grid-table select {
+      width: 100%;
+      padding: 5px 6px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 13px;
+      color: #111;
+      background: #fff;
+      font-family: inherit;
+    }
+    .grid-table input:focus, .grid-table select:focus {
+      outline: none;
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px #bfdbfe;
+    }
+    .c-lbl  { width: 26px; }
+    .c-name { width: 86px; }
+    .c-dim  { width: 64px; }
+    .c-thk  { width: 68px; }
+    .c-qty  { width: 50px; }
+    .c-del  { width: 22px; }
+
+    .piece-label {
+      display: inline-block;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      text-align: center;
+      line-height: 22px;
+      font-weight: 700;
+      font-size: 12px;
+      color: #fff;
+    }
+    .btn-remove {
+      background: none;
+      border: none;
+      color: #ef4444;
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .btn-remove:hover { background: #fee2e2; }
+
+    .btn-add {
+      margin-top: 10px;
+      background: none;
+      border: 1px dashed #9ca3af;
+      color: #6b7280;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      width: 100%;
+    }
+    .btn-add:hover { background: #f9fafb; border-color: #6b7280; color: #374151; }
+
+    #btn-calculate {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+    }
+    #btn-calculate:hover { background: #1d4ed8; }
+    #btn-calculate:active { background: #1e40af; }
+
+    #errors {
+      display: none;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #b91c1c;
+      font-size: 13px;
+    }
+    #errors ul { margin-left: 16px; margin-top: 4px; }
+
+    /* ── Utdatapanel ── */
+    #output { display: flex; flex-direction: column; gap: 12px; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid #d1d5db;
+    }
+    .tab {
+      background: none;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b7280;
+      cursor: pointer;
+      margin-bottom: -1px;
+      font-family: inherit;
+    }
+    .tab:hover { color: #374151; }
+    .tab.active {
+      background: #fff;
+      border-color: #d1d5db;
+      color: #1e3a5f;
+    }
+
+    .panel { display: none; flex-direction: column; gap: 12px; }
+    .panel.active { display: flex; }
+
+    .card {
+      background: #fff;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    /* Gruppväljare */
+    #group-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+    .group-chip {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 999px;
+      padding: 5px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #374151;
+      font-family: inherit;
+    }
+    .group-chip:hover { border-color: #9ca3af; }
+    .group-chip.active {
+      background: #1e3a5f;
+      border-color: #1e3a5f;
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* Layoutvisare */
+    #viz-card { padding-top: 12px; }
+    #viz-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    #viz-head .nav {
+      display: flex;
+      gap: 4px;
+    }
+    .nav button {
+      width: 28px;
+      height: 28px;
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 15px;
+      line-height: 1;
+      color: #374151;
+      font-family: inherit;
+    }
+    .nav button:hover:not(:disabled) { background: #f3f4f6; }
+    .nav button:disabled { opacity: 0.35; cursor: default; }
+    #viz-title { font-weight: 600; font-size: 14px; }
+    #viz-meta { font-size: 13px; color: #6b7280; }
+    .badge {
+      display: inline-block;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    #focus-note {
+      display: none;
+      font-size: 13px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 10px;
+    }
+    #focus-note button {
+      background: none;
+      border: none;
+      color: #92400e;
+      text-decoration: underline;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      padding: 0 0 0 6px;
+    }
+
+    .svg-wrap { margin: 0 auto; }
+    .svg-wrap svg { display: block; width: 100%; height: 100%; overflow: visible; }
+    .placement { cursor: pointer; }
+    .placement.dim { opacity: 0.16; }
+
+    #viz-placeholder {
+      color: #9ca3af;
+      font-size: 14px;
+      text-align: center;
+      padding: 40px 0;
+    }
+
+    /* Sammanfattningstabell */
+    .sum-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 8px;
+    }
+    .sum-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .sum-table th {
+      text-align: right;
+      font-weight: 600;
+      color: #6b7280;
+      font-size: 12px;
+      padding: 5px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+    .sum-table th:nth-child(1), .sum-table th:nth-child(2) { text-align: left; }
+    .sum-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f3f4f6;
+      text-align: right;
+      white-space: nowrap;
+    }
+    .sum-table td:nth-child(1), .sum-table td:nth-child(2) { text-align: left; }
+    .sum-table tbody tr { cursor: pointer; }
+    .sum-table tbody tr:hover { background: #f9fafb; }
+    .sum-table tbody tr.selected { background: #eff6ff; }
+    .sum-table tbody tr.too-large { background: #fffbeb; color: #92400e; }
+    .group-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    .group-head h3 { font-size: 15px; font-weight: 700; }
+    .group-head .meta { font-size: 13px; color: #6b7280; }
+    .group-block + .group-block { margin-top: 18px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
+
+    .totals {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 2px solid #e5e7eb;
+      font-size: 13px;
+      color: #6b7280;
+      line-height: 1.7;
+    }
+    .totals strong { color: #1a1a1a; }
+    .totals .boards-count { font-size: 20px; font-weight: 700; color: #2563eb; }
+
+    .warn {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      color: #92400e;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+
+    /* Textflik */
+    .text-actions { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+    .btn-sec {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      color: #374151;
+      font-family: inherit;
+      font-weight: 600;
+    }
+    .btn-sec:hover { background: #f3f4f6; }
+    #copy-status { font-size: 13px; color: #059669; }
+    #text-output {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.55;
+      white-space: pre;
+      overflow-x: auto;
+      color: #1a1a1a;
+    }
+
+    /* Print */
+    @media print {
+      #controls, .tabs, .nav, #group-tabs, .text-actions { display: none !important; }
+      body { background: #fff; }
+      main { display: block; padding: 0; }
+      .card { border: none; padding: 0; }
+      .panel { display: flex !important; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Träskiva-optimerare <span style="opacity:.6;font-weight:400">v2</span></h1>
+  <p>Beräkna åtgång, spill och kapschema för en hel offert — flera mått och tjocklekar</p>
+</header>
+
+<main>
+  <!-- ── Kontrollpanel ── -->
+  <section id="controls">
+
+    <fieldset>
+      <legend>Grundskivor</legend>
+      <table class="grid-table" id="boards-table">
+        <thead>
+          <tr>
+            <th class="c-dim">Längd (mm)</th>
+            <th class="c-dim">Bredd (mm)</th>
+            <th class="c-thk">Tjocklek</th>
+            <th class="c-del"></th>
+          </tr>
+        </thead>
+        <tbody id="boards-body"></tbody>
+      </table>
+      <button class="btn-add" id="btn-add-board">+ Lägg till grundskiva</button>
+      <div class="hint">Tjocklek är frivillig. Ange den bara om du har flera material — då optimeras varje tjocklek för sig mot sin egen grundskiva.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Alternativ</legend>
+      <div class="opt-row">
+        <input type="checkbox" id="kerf-enabled">
+        <label for="kerf-enabled">Ta hänsyn till sågsnittets tjocklek</label>
+      </div>
+      <div id="kerf-detail" style="display:none">
+        <input type="number" id="kerf-mm" min="0.1" step="0.5" value="3">
+        <span class="unit">mm per snitt</span>
+      </div>
+      <div class="opt-row">
+        <input type="checkbox" id="rotation-enabled">
+        <label for="rotation-enabled">Tillåt rotation av bitar (ådring spelar ingen roll)</label>
+      </div>
+      <div class="opt-row">
+        <input type="checkbox" id="mix-enabled" checked>
+        <label for="mix-enabled">Blanda olika storlekar på samma skiva</label>
+      </div>
+      <div class="hint">Utan blandning får varje kapmått egna skivor — mer spill, men enklare i verkstaden och entydig siffra per storlek.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Skivor att kapa</legend>
+      <table class="grid-table" id="pieces-table">
+        <thead>
+          <tr>
+            <th class="c-lbl"></th>
+            <th class="c-name">Benämning</th>
+            <th class="c-dim">Längd</th>
+            <th class="c-dim">Bredd</th>
+            <th class="c-thk col-t">Tjocklek</th>
+            <th class="c-qty">Antal</th>
+            <th class="c-del"></th>
+          </tr>
+        </thead>
+        <tbody id="pieces-body"></tbody>
+      </table>
+      <button class="btn-add" id="btn-add-piece">+ Lägg till skivstorlek</button>
+    </fieldset>
+
+    <div id="errors"></div>
+
+    <button id="btn-calculate">Beräkna</button>
+
+  </section>
+
+  <!-- ── Utdata ── -->
+  <section id="output">
+    <div class="tabs">
+      <button class="tab active" data-tab="layout">Layouter</button>
+      <button class="tab" data-tab="text">Text</button>
+    </div>
+
+    <div class="panel active" id="panel-layout">
+      <div id="group-tabs"></div>
+      <div class="card" id="viz-card">
+        <div id="viz-head" style="display:none">
+          <div class="nav">
+            <button id="btn-prev" title="Föregående layout">‹</button>
+            <button id="btn-next" title="Nästa layout">›</button>
+          </div>
+          <span id="viz-title"></span>
+          <span id="viz-meta"></span>
+        </div>
+        <div id="focus-note"></div>
+        <div id="viz-body">
+          <div id="viz-placeholder">
+            Fyll i mått och tryck på <strong>Beräkna</strong> för att se resultatet.
+          </div>
+        </div>
+      </div>
+      <div class="card" id="summary" style="display:none"></div>
+    </div>
+
+    <div class="panel" id="panel-text">
+      <div class="card">
+        <div class="text-actions">
+          <button class="btn-sec" id="btn-copy">Kopiera text</button>
+          <button class="btn-sec" id="btn-download">Ladda ner .txt</button>
+          <span id="copy-status"></span>
+        </div>
+        <pre id="text-output">Tryck på Beräkna för att få en textsammanfattning.</pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+'use strict';
+
+// ── Konstanter ───────────────────────────────────────────────────────────────
+const EPS = 1e-6;
+const MAX_PATTERNS = 400;        // skyddsnät mot oändlig mönsterloop
+const MAX_ITEMS_PER_BOARD = 600; // skyddsnät mot mycket små bitar
+const DEFAULT_BOARD = { h: 2800, w: 2070 };
+
+let nextBoardId = 1;
+let nextPieceId = 1;
+let clipCounter = 0;
+
+const state = {
+  boards: [],
+  pieces: [],
+  opts: { kerf: 0, kerfEnabled: false, rotation: false, mix: true },
+  result: null,
+  view: { tab: 'layout', group: 0, pattern: 0, focus: null }
+};
+
+// ── Hjälpare ─────────────────────────────────────────────────────────────────
+
+function num(v) { const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : 0; }
+
+function normT(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (s === '') return '';
+  const n = parseFloat(s.replace(',', '.'));
+  return isFinite(n) ? String(n) : s;
+}
+
+function nf(n, dec) {
+  return n.toLocaleString('sv-SE', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+function m2(mm2, dec) { return nf(mm2 / 1e6, dec === undefined ? 2 : dec); }
+
+// Millimetermått skrivs utan tusentalsavgränsare: 1800, inte 1 800
+function dim(n) { return String(Math.round(n * 10) / 10).replace('.', ','); }
+
+function labelFromIndex(i) {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  if (i < 26) return letters[i];
+  return letters[Math.floor(i / 26) - 1] + letters[i % 26];
+}
+
+function pieceColor(index)     { return `hsl(${(index * 47) % 360}, 55%, 68%)`; }
+function pieceColorDark(index) { return `hsl(${(index * 47) % 360}, 55%, 38%)`; }
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ── Formulär: rader ──────────────────────────────────────────────────────────
+
+function addBoardRow(vals) {
+  const v = vals || {};
+  const tr = document.createElement('tr');
+  tr.dataset.id = nextBoardId++;
+  tr.innerHTML = `
+    <td><input type="number" class="b-h" min="1" step="1" value="${v.h != null ? v.h : DEFAULT_BOARD.h}"></td>
+    <td><input type="number" class="b-w" min="1" step="1" value="${v.w != null ? v.w : DEFAULT_BOARD.w}"></td>
+    <td><input type="number" class="b-t" min="0" step="0.5" placeholder="valfri" value="${v.t != null ? v.t : ''}"></td>
+    <td><button class="btn-remove" title="Ta bort rad">&times;</button></td>
+  `;
+  tr.querySelector('.btn-remove').addEventListener('click', () => {
+    if (document.querySelectorAll('#boards-body tr').length <= 1) return;
+    tr.remove();
+    syncThicknessOptions();
+  });
+  tr.querySelector('.b-t').addEventListener('input', syncThicknessOptions);
+  document.getElementById('boards-body').appendChild(tr);
+  syncThicknessOptions();
+}
+
+function addPieceRow(vals) {
+  const v = vals || {};
+  const tbody = document.getElementById('pieces-body');
+  const idx = tbody.rows.length;
+  const tr = document.createElement('tr');
+  tr.dataset.id = nextPieceId++;
+  tr.innerHTML = `
+    <td><span class="piece-label" style="background:${pieceColor(idx)}">${labelFromIndex(idx)}</span></td>
+    <td><input type="text" class="p-name" placeholder="t.ex. Bordsskiva" value="${v.name ? esc(v.name) : ''}"></td>
+    <td><input type="number" class="p-h" min="1" step="1" placeholder="1800" value="${v.h != null ? v.h : ''}"></td>
+    <td><input type="number" class="p-w" min="1" step="1" placeholder="800" value="${v.w != null ? v.w : ''}"></td>
+    <td class="col-t"><select class="p-t"></select></td>
+    <td><input type="number" class="p-qty" min="0" step="1" value="${v.qty != null ? v.qty : 1}"></td>
+    <td><button class="btn-remove" title="Ta bort rad">&times;</button></td>
+  `;
+  tr.querySelector('.btn-remove').addEventListener('click', () => { tr.remove(); refreshLabels(); });
+  tbody.appendChild(tr);
+  syncThicknessOptions();
+  if (v.t != null) tr.querySelector('.p-t').value = normT(v.t);
+}
+
+function refreshLabels() {
+  document.querySelectorAll('#pieces-body tr').forEach((row, i) => {
+    const span = row.querySelector('.piece-label');
+    span.textContent = labelFromIndex(i);
+    span.style.background = pieceColor(i);
+  });
+}
+
+// Fyller tjockleks-select från grundskivorna och gömmer kolumnen när ingen tjocklek finns
+function syncThicknessOptions() {
+  const ts = [];
+  document.querySelectorAll('#boards-body .b-t').forEach(inp => {
+    const t = normT(inp.value);
+    if (t !== '' && !ts.includes(t)) ts.push(t);
+  });
+  const show = ts.length > 0;
+
+  document.querySelectorAll('#pieces-body .p-t').forEach(sel => {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">—</option>' +
+      ts.map(t => `<option value="${esc(t)}">${esc(t)} mm</option>`).join('');
+    sel.value = ts.indexOf(cur) >= 0 ? cur : '';
+  });
+  document.querySelectorAll('.col-t').forEach(el => { el.style.display = show ? '' : 'none'; });
+}
+
+// ── Formulär → state ─────────────────────────────────────────────────────────
+
+function readForm() {
+  state.boards = [...document.querySelectorAll('#boards-body tr')].map(tr => ({
+    id: +tr.dataset.id,
+    h: num(tr.querySelector('.b-h').value),
+    w: num(tr.querySelector('.b-w').value),
+    t: normT(tr.querySelector('.b-t').value)
+  }));
+
+  state.opts.kerfEnabled = document.getElementById('kerf-enabled').checked;
+  state.opts.kerf = state.opts.kerfEnabled ? num(document.getElementById('kerf-mm').value) : 0;
+  state.opts.rotation = document.getElementById('rotation-enabled').checked;
+  state.opts.mix = document.getElementById('mix-enabled').checked;
+
+  state.pieces = [...document.querySelectorAll('#pieces-body tr')].map((tr, i) => ({
+    id: +tr.dataset.id,
+    idx: i,
+    label: labelFromIndex(i),
+    name: tr.querySelector('.p-name').value.trim(),
+    h: num(tr.querySelector('.p-h').value),
+    w: num(tr.querySelector('.p-w').value),
+    t: normT(tr.querySelector('.p-t').value),
+    qty: Math.floor(num(tr.querySelector('.p-qty').value))
+  }));
+}
+
+// Matcha en tjocklek mot en grundskiva. '' = ingen tjocklek angiven.
+function boardForThickness(t) {
+  let b = state.boards.find(b => b.t === t);
+  if (!b) b = state.boards.find(b => b.t === '');
+  if (!b && state.boards.length === 1) b = state.boards[0];
+  return b || null;
+}
+
+function validate() {
+  const errors = [];
+
+  if (state.boards.length === 0) errors.push('Lägg till minst en grundskiva.');
+  state.boards.forEach((b, i) => {
+    if (b.h <= 0 || b.w <= 0) errors.push(`Grundskiva ${i + 1}: längd och bredd måste vara större än 0.`);
+  });
+  const seen = {};
+  state.boards.forEach(b => {
+    if (seen[b.t]) {
+      errors.push(b.t === ''
+        ? 'Två grundskivor saknar tjocklek — ange tjocklek så de går att skilja åt.'
+        : `Två grundskivor har tjocklek ${b.t} mm.`);
+    }
+    seen[b.t] = true;
+  });
+
+  if (state.opts.kerfEnabled && state.opts.kerf <= 0) {
+    errors.push('Sågsnittets tjocklek måste vara större än 0 mm.');
+  }
+
+  const active = state.pieces.filter(p => p.qty > 0);
+  if (active.length === 0) errors.push('Lägg till minst en skivstorlek med antal > 0.');
+
+  active.forEach(p => {
+    const nm = p.name ? `${p.label} (${p.name})` : `Skiva ${p.label}`;
+    if (p.w <= 0 || p.h <= 0) errors.push(`${nm}: längd och bredd måste vara större än 0.`);
+    if (state.opts.kerf > 0 && (state.opts.kerf >= p.w || state.opts.kerf >= p.h)) {
+      errors.push(`${nm}: sågsnittet (${state.opts.kerf} mm) är lika stort eller större än ett av måtten.`);
+    }
+    if (!boardForThickness(p.t)) {
+      errors.push(`${nm}: ingen grundskiva angiven för ${p.t} mm.`);
+    }
+  });
+
+  return errors;
+}
+
+function showErrors(errors) {
+  const el = document.getElementById('errors');
+  if (errors.length === 0) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  el.innerHTML = '<strong>Kontrollera följande:</strong><ul>' +
+    errors.map(e => `<li>${esc(e)}</li>`).join('') + '</ul>';
+}
+
+// ── Packningsmotor ───────────────────────────────────────────────────────────
+// Algoritmrymd: x längs skivans BREDD (board.w), y längs skivans LÄNGD (board.h).
+// En bit har w = bredd (x) och h = längd (y). Sågsnitt läggs på varje bits
+// effektiva mått (konservativt: räknar ett snitt även mot skivkant).
+
+function contains(a, b) {
+  return b.x >= a.x - EPS && b.y >= a.y - EPS &&
+         b.x + b.w <= a.x + a.w + EPS && b.y + b.h <= a.y + a.h + EPS;
+}
+
+function splitFree(free, used) {
+  const out = [];
+  for (const fr of free) {
+    const disjoint = used.x >= fr.x + fr.w - EPS || used.x + used.w <= fr.x + EPS ||
+                     used.y >= fr.y + fr.h - EPS || used.y + used.h <= fr.y + EPS;
+    if (disjoint) { out.push(fr); continue; }
+    if (used.x > fr.x + EPS)
+      out.push({ x: fr.x, y: fr.y, w: used.x - fr.x, h: fr.h });
+    if (used.x + used.w < fr.x + fr.w - EPS)
+      out.push({ x: used.x + used.w, y: fr.y, w: fr.x + fr.w - used.x - used.w, h: fr.h });
+    if (used.y > fr.y + EPS)
+      out.push({ x: fr.x, y: fr.y, w: fr.w, h: used.y - fr.y });
+    if (used.y + used.h < fr.y + fr.h - EPS)
+      out.push({ x: fr.x, y: used.y + used.h, w: fr.w, h: fr.y + fr.h - used.y - used.h });
+  }
+  // Ta bort rektanglar som ryms i en annan
+  const res = [];
+  for (let i = 0; i < out.length; i++) {
+    let dropped = false;
+    for (let j = 0; j < out.length && !dropped; j++) {
+      if (i === j) continue;
+      if (contains(out[j], out[i]) && (!contains(out[i], out[j]) || j < i)) dropped = true;
+    }
+    if (!dropped) res.push(out[i]);
+  }
+  return res;
+}
+
+function betterSpot(a, b) {
+  if (Math.abs(a.leftover - b.leftover) > EPS) return a.leftover < b.leftover;
+  if (a.prefRank !== b.prefRank) return a.prefRank < b.prefRank;
+  if (Math.abs(a.shortSide - b.shortSide) > EPS) return a.shortSide < b.shortSide;
+  if (Math.abs(a.y - b.y) > EPS) return a.y < b.y;
+  return a.x < b.x;
+}
+
+// MaxRects, best-area-fit. items är redan sorterade.
+function maxRectsFill(board, items, allowRot, preferRot) {
+  let free = [{ x: 0, y: 0, w: board.w, h: board.h }];
+  const placements = [];
+  const counts = {};
+  let usedArea = 0;
+
+  for (const it of items) {
+    let best = null;
+    for (const fr of free) {
+      const orients = [{ ew: it.ew, eh: it.eh, pw: it.w, ph: it.h, rot: false }];
+      if (allowRot) orients.push({ ew: it.eh, eh: it.ew, pw: it.h, ph: it.w, rot: true });
+      for (const o of orients) {
+        if (o.ew > fr.w + EPS || o.eh > fr.h + EPS) continue;
+        const cand = {
+          leftover: fr.w * fr.h - o.ew * o.eh,
+          prefRank: (o.rot === preferRot) ? 0 : 1,
+          shortSide: Math.min(fr.w - o.ew, fr.h - o.eh),
+          x: fr.x, y: fr.y, o, fr
+        };
+        if (!best || betterSpot(cand, best)) best = cand;
+      }
+    }
+    if (!best) continue;
+
+    const used = { x: best.fr.x, y: best.fr.y, w: best.o.ew, h: best.o.eh };
+    placements.push({
+      pieceId: it.id,
+      x: used.x, y: used.y,
+      w: best.o.pw, h: best.o.ph,
+      origW: it.w, origH: it.h,
+      rotated: best.o.rot
+    });
+    counts[it.id] = (counts[it.id] || 0) + 1;
+    usedArea += it.w * it.h;
+    free = splitFree(free, used);
+  }
+
+  return { placements, counts, usedArea, boardArea: board.w * board.h };
+}
+
+// Packar EN skiva ur efterfrågan. Provar flera sorteringar och orienterings-
+// preferenser och behåller den layout som utnyttjar mest yta.
+function packOneBoard(board, types, opts) {
+  const k = opts.kerf;
+  const boardArea = board.w * board.h;
+  const items = [];
+
+  types.forEach(t => {
+    const ew = t.w + k, eh = t.h + k;
+    const fitsNormal = ew <= board.w + EPS && eh <= board.h + EPS;
+    const fitsRot = opts.rotation && eh <= board.w + EPS && ew <= board.h + EPS;
+    if (!fitsNormal && !fitsRot) return;
+    const maxFit = Math.max(1, Math.floor(boardArea / (ew * eh)));
+    const n = Math.min(t.qty, maxFit);
+    for (let i = 0; i < n; i++) {
+      items.push({ id: t.id, w: t.w, h: t.h, ew, eh, area: ew * eh });
+    }
+  });
+
+  if (items.length === 0) return null;
+
+  const sorts = [
+    (a, b) => b.eh - a.eh || b.ew - a.ew,
+    (a, b) => b.ew - a.ew || b.eh - a.eh,
+    (a, b) => b.area - a.area || b.eh - a.eh,
+    (a, b) => Math.max(b.ew, b.eh) - Math.max(a.ew, a.eh) || b.area - a.area
+  ];
+  const prefs = opts.rotation ? [false, true] : [false];
+
+  let best = null;
+  for (const sort of sorts) {
+    const list = items.slice().sort(sort).slice(0, MAX_ITEMS_PER_BOARD);
+    for (const pref of prefs) {
+      const r = maxRectsFill(board, list, opts.rotation, pref);
+      if (!best || r.usedArea > best.usedArea + EPS) best = r;
+    }
+  }
+  return best && best.placements.length > 0 ? best : null;
+}
+
+// Packar en hel efterfrågan. Varje unikt mönster sparas en gång med antal
+// upprepningar — 500 bitar som ger 2 st/skiva blir ETT mönster × 250 skivor.
+function packDemand(board, pieces, opts) {
+  const remaining = {};
+  pieces.forEach(p => { remaining[p.id] = p.qty; });
+  const patterns = [];
+  let guard = 0;
+  let hitCap = false;
+
+  for (;;) {
+    const types = pieces
+      .filter(p => remaining[p.id] > 0)
+      .map(p => ({ id: p.id, w: p.w, h: p.h, qty: remaining[p.id] }));
+    if (types.length === 0) break;
+    if (guard++ >= MAX_PATTERNS) { hitCap = true; break; }
+
+    const pat = packOneBoard(board, types, opts);
+    if (!pat) break;
+
+    let repeats = Infinity;
+    Object.keys(pat.counts).forEach(id => {
+      repeats = Math.min(repeats, Math.floor(remaining[id] / pat.counts[id]));
+    });
+    repeats = Math.max(1, repeats);
+    Object.keys(pat.counts).forEach(id => { remaining[id] -= pat.counts[id] * repeats; });
+
+    patterns.push({
+      placements: pat.placements,
+      counts: pat.counts,
+      usedArea: pat.usedArea,
+      boardArea: pat.boardArea,
+      wastePercent: (1 - pat.usedArea / pat.boardArea) * 100,
+      repeats
+    });
+  }
+
+  const unplaced = {};
+  Object.keys(remaining).forEach(id => { if (remaining[id] > 0) unplaced[id] = remaining[id]; });
+  return { patterns, unplaced, hitCap };
+}
+
+function patternSignature(pat) {
+  return pat.placements
+    .map(p => [p.pieceId, p.x, p.y, p.w, p.h, p.rotated ? 1 : 0].join(':'))
+    .sort()
+    .join('|');
+}
+
+function dedupePatterns(patterns) {
+  const map = new Map();
+  patterns.forEach(pat => {
+    const sig = patternSignature(pat);
+    if (map.has(sig)) map.get(sig).repeats += pat.repeats;
+    else map.set(sig, Object.assign({}, pat));
+  });
+  return [...map.values()].sort((a, b) => b.repeats - a.repeats || b.usedArea - a.usedArea);
+}
+
+function canFitOnBoard(board, p, opts) {
+  const k = opts.kerf;
+  const normal = p.w + k <= board.w + EPS && p.h + k <= board.h + EPS;
+  const rot = opts.rotation && p.h + k <= board.w + EPS && p.w + k <= board.h + EPS;
+  return normal || rot;
+}
+
+// ── Beräkning ────────────────────────────────────────────────────────────────
+
+function buildGroup(key, board, pieces, opts) {
+  const perType = {};
+  const usable = [];
+
+  pieces.forEach(p => {
+    const fits = canFitOnBoard(board, p, opts);
+    perType[p.id] = {
+      piece: p, requested: p.qty, placed: 0, tooLarge: !fits,
+      soloPerBoard: 0, soloBoards: 0, soloWaste: 0, maxPerBoard: 0
+    };
+    if (fits) usable.push(p);
+  });
+
+  // Ensamsiffra per storlek — alltid entydig, oavsett blandning
+  usable.forEach(p => {
+    const solo = packOneBoard(board, [{ id: p.id, w: p.w, h: p.h, qty: p.qty }], opts);
+    const n = solo ? (solo.counts[p.id] || 0) : 0;
+    const pt = perType[p.id];
+    pt.soloPerBoard = n;
+    pt.soloBoards = n > 0 ? Math.ceil(p.qty / n) : 0;
+    pt.soloWaste = n > 0 ? (1 - (n * p.w * p.h) / (board.w * board.h)) * 100 : 100;
+  });
+
+  let patterns = [];
+  let hitCap = false;
+  const unplaced = {};
+
+  if (opts.mix) {
+    const r = packDemand(board, usable, opts);
+    patterns = r.patterns;
+    hitCap = r.hitCap;
+    Object.assign(unplaced, r.unplaced);
+  } else {
+    usable.forEach(p => {
+      const r = packDemand(board, [p], opts);
+      patterns = patterns.concat(r.patterns);
+      hitCap = hitCap || r.hitCap;
+      Object.assign(unplaced, r.unplaced);
+    });
+  }
+
+  patterns = dedupePatterns(patterns);
+
+  patterns.forEach(pat => {
+    Object.keys(pat.counts).forEach(id => {
+      if (perType[id]) {
+        perType[id].placed += pat.counts[id] * pat.repeats;
+        perType[id].maxPerBoard = Math.max(perType[id].maxPerBoard, pat.counts[id]);
+      }
+    });
+  });
+
+  const boardsNeeded = patterns.reduce((s, p) => s + p.repeats, 0);
+  const boardArea = board.w * board.h;
+  const totalBoardArea = boardArea * boardsNeeded;
+  const placedArea = patterns.reduce((s, p) => s + p.usedArea * p.repeats, 0);
+
+  return {
+    key, board, pieces, patterns, perType, boardsNeeded,
+    boardArea, totalBoardArea, placedArea,
+    wasteArea: totalBoardArea - placedArea,
+    wastePercent: totalBoardArea > 0 ? (1 - placedArea / totalBoardArea) * 100 : 0,
+    unplaced, hitCap
+  };
+}
+
+function compute() {
+  const opts = state.opts;
+  const active = state.pieces.filter(p => p.qty > 0 && p.w > 0 && p.h > 0);
+
+  const keys = [];
+  active.forEach(p => { if (keys.indexOf(p.t) < 0) keys.push(p.t); });
+  keys.sort((a, b) => (a === '' ? -1 : b === '' ? 1 : parseFloat(a) - parseFloat(b)));
+
+  const groups = keys.map(key =>
+    buildGroup(key, boardForThickness(key), active.filter(p => p.t === key), opts));
+
+  const totals = groups.reduce((acc, g) => {
+    acc.boards += g.boardsNeeded;
+    acc.boardArea += g.totalBoardArea;
+    acc.placedArea += g.placedArea;
+    return acc;
+  }, { boards: 0, boardArea: 0, placedArea: 0 });
+  totals.wasteArea = totals.boardArea - totals.placedArea;
+  totals.wastePercent = totals.boardArea > 0 ? (1 - totals.placedArea / totals.boardArea) * 100 : 0;
+
+  const anyThickness = state.boards.some(b => b.t !== '') || active.some(p => p.t !== '');
+
+  return { groups, totals, anyThickness };
+}
+
+// ── SVG ──────────────────────────────────────────────────────────────────────
+
+const NS = 'http://www.w3.org/2000/svg';
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(NS, tag);
+  Object.keys(attrs).forEach(k => el.setAttribute(k, attrs[k]));
+  return el;
+}
+
+function renderPattern(pattern, board, opts, focusId) {
+  const kerfMm = opts.kerf;
+
+  // Skivan läggs ned: Längd (board.h) horisontellt, Bredd (board.w) vertikalt.
+  // Algoritmrymd (x,y) → SVG: svgX = y, svgY = x.
+  const svgW = board.h;
+  const svgH = board.w;
+
+  const MT = svgH * 0.075, MR = svgW * 0.075, MB = svgH * 0.01, ML = svgW * 0.005;
+  const totalW = svgW + ML + MR;
+  const totalH = svgH + MT + MB;
+  const OX = ML, OY = MT;
+
+  const svg = svgEl('svg', {
+    viewBox: `0 0 ${totalW} ${totalH}`,
+    preserveAspectRatio: 'xMidYMid meet',
+    overflow: 'visible'
+  });
+
+  const defs = document.createElementNS(NS, 'defs');
+  const patSize = svgH * 0.04;
+  const hatch = svgEl('pattern', {
+    id: 'hatch-rot', width: patSize, height: patSize,
+    patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)'
+  });
+  hatch.appendChild(svgEl('line', {
+    x1: 0, y1: 0, x2: 0, y2: patSize,
+    stroke: 'rgba(40,70,140,0.45)', 'stroke-width': patSize * 0.18
+  }));
+  defs.appendChild(hatch);
+  svg.appendChild(defs);
+
+  svg.appendChild(svgEl('rect', { x: OX, y: OY, width: svgW, height: svgH, fill: '#e8ddd0' }));
+
+  const grainSpacing = svgH * 0.06;
+  const grainSW = Math.max(svgW, svgH) * 0.003;
+  for (let y = grainSpacing; y < svgH; y += grainSpacing) {
+    svg.appendChild(svgEl('line', {
+      x1: OX, y1: OY + y, x2: OX + svgW, y2: OY + y,
+      stroke: 'rgba(120,80,30,0.35)', 'stroke-width': grainSW
+    }));
+  }
+
+  const colorIdx = {};
+  state.pieces.forEach(p => { colorIdx[p.id] = p.idx; });
+
+  pattern.placements.forEach(p => {
+    const ci = colorIdx[p.pieceId] || 0;
+    const fill = pieceColor(ci);
+    const stroke = pieceColorDark(ci);
+    const sw = Math.max(svgW, svgH) * 0.002;
+
+    const sx = OX + p.y, sy = OY + p.x;   // 90°-vridning
+    const rw = p.h, rh = p.w;
+
+    const g = svgEl('g', { class: 'placement' + (focusId != null && focusId !== p.pieceId ? ' dim' : '') });
+    g.dataset.pieceId = p.pieceId;
+    g.addEventListener('click', () => setFocus(p.pieceId));
+
+    g.appendChild(svgEl('rect', {
+      x: sx, y: sy, width: rw, height: rh, fill, stroke, 'stroke-width': sw
+    }));
+
+    const clipId = `gc${clipCounter++}`;
+    const cp = svgEl('clipPath', { id: clipId });
+    cp.appendChild(svgEl('rect', { x: sx, y: sy, width: rw, height: rh }));
+    defs.appendChild(cp);
+
+    if (!p.rotated) {
+      const startY = Math.ceil(p.x / grainSpacing) * grainSpacing;
+      for (let gy = startY; gy < p.x + p.w; gy += grainSpacing) {
+        g.appendChild(svgEl('line', {
+          x1: sx, y1: OY + gy, x2: sx + rw, y2: OY + gy,
+          stroke: 'rgba(100,60,15,0.40)', 'stroke-width': grainSW,
+          'clip-path': `url(#${clipId})`
+        }));
+      }
+    } else {
+      g.appendChild(svgEl('rect', {
+        x: sx, y: sy, width: rw, height: rh,
+        fill: 'url(#hatch-rot)', 'clip-path': `url(#${clipId})`
+      }));
+      g.appendChild(svgEl('rect', {
+        x: sx, y: sy, width: rw, height: rh,
+        fill: 'none', stroke: 'rgba(40,80,180,0.7)', 'stroke-width': sw * 2
+      }));
+    }
+
+    if (kerfMm > 0) {
+      g.appendChild(svgEl('line', {
+        x1: sx, y1: sy + rh, x2: sx + rw + kerfMm, y2: sy + rh,
+        stroke: '#777', 'stroke-width': kerfMm, opacity: '0.45'
+      }));
+      g.appendChild(svgEl('line', {
+        x1: sx + rw, y1: sy, x2: sx + rw, y2: sy + rh + kerfMm,
+        stroke: '#777', 'stroke-width': kerfMm, opacity: '0.45'
+      }));
+    }
+
+    if (rw > svgW * 0.04 && rh > svgH * 0.04) {
+      const showDims = rw > svgW * 0.08 && rh > svgH * 0.08;
+      // Smala remsor får en textstorlek som styrs av remsans bredd, annars blir bokstaven oläslig
+      const fs = showDims ? Math.min(rw, rh) * 0.16
+                          : Math.min(rh * 0.55, rw * 0.55, svgH * 0.05);
+      const cx = sx + rw / 2, cy = sy + rh / 2;
+      const label = state.pieces.find(x => x.id === p.pieceId);
+      const text = svgEl('text', {
+        x: cx, y: cy, 'text-anchor': 'middle', 'dominant-baseline': 'middle',
+        fill: '#1a1a1a', 'font-size': fs,
+        'font-family': '-apple-system, sans-serif', 'font-weight': '600'
+      });
+      if (rw > svgW * 0.08 && rh > svgH * 0.08) {
+        const t1 = svgEl('tspan', { x: cx });
+        t1.setAttribute('dy', `-${fs * 0.6}`);
+        t1.textContent = (label ? label.label : '') + (p.rotated ? ' ↺' : '');
+        const t2 = svgEl('tspan', { x: cx, 'font-size': fs * 0.75, 'font-weight': '400' });
+        t2.setAttribute('dy', `${fs * 1.3}`);
+        t2.textContent = `${dim(p.origH)}×${dim(p.origW)}`;
+        text.appendChild(t1); text.appendChild(t2);
+      } else {
+        text.textContent = (label ? label.label : '') + (p.rotated ? '↺' : '');
+      }
+      g.appendChild(text);
+    }
+
+    svg.appendChild(g);
+  });
+
+  svg.appendChild(svgEl('rect', {
+    x: OX, y: OY, width: svgW, height: svgH,
+    fill: 'none', stroke: '#374151', 'stroke-width': Math.max(svgW, svgH) * 0.003
+  }));
+
+  // Måttsättning
+  const annFS = svgH * 0.045;
+  const annSW = Math.max(svgW, svgH) * 0.002;
+  const annC = '#374151';
+  const tickL = MT * 0.30, tickR = MR * 0.30;
+
+  const dimY = OY - MT * 0.50;
+  svg.appendChild(svgEl('line', { x1: OX, y1: dimY, x2: OX + svgW, y2: dimY, stroke: annC, 'stroke-width': annSW }));
+  svg.appendChild(svgEl('line', { x1: OX, y1: dimY - tickL, x2: OX, y2: dimY + tickL, stroke: annC, 'stroke-width': annSW }));
+  svg.appendChild(svgEl('line', { x1: OX + svgW, y1: dimY - tickL, x2: OX + svgW, y2: dimY + tickL, stroke: annC, 'stroke-width': annSW }));
+  const tl = svgEl('text', {
+    x: OX + svgW / 2, y: dimY - annFS * 0.25, 'text-anchor': 'middle',
+    fill: annC, 'font-size': annFS, 'font-family': '-apple-system, sans-serif'
+  });
+  tl.textContent = `${dim(board.h)} mm`;
+  svg.appendChild(tl);
+
+  const dimX = OX + svgW + MR * 0.55;
+  svg.appendChild(svgEl('line', { x1: dimX, y1: OY, x2: dimX, y2: OY + svgH, stroke: annC, 'stroke-width': annSW }));
+  svg.appendChild(svgEl('line', { x1: dimX - tickR, y1: OY, x2: dimX + tickR, y2: OY, stroke: annC, 'stroke-width': annSW }));
+  svg.appendChild(svgEl('line', { x1: dimX - tickR, y1: OY + svgH, x2: dimX + tickR, y2: OY + svgH, stroke: annC, 'stroke-width': annSW }));
+  const tb = svgEl('text', {
+    x: dimX, y: OY + svgH / 2, 'text-anchor': 'middle', fill: annC, 'font-size': annFS,
+    'font-family': '-apple-system, sans-serif',
+    transform: `rotate(-90, ${dimX}, ${OY + svgH / 2})`
+  });
+  tb.setAttribute('dy', `-${annFS * 0.4}`);
+  tb.textContent = `${dim(board.w)} mm`;
+  svg.appendChild(tb);
+
+  // Behåll skivans exakta proportioner
+  const wrap = document.createElement('div');
+  wrap.className = 'svg-wrap';
+  wrap.style.aspectRatio = `${totalW} / ${totalH}`;
+  wrap.style.width = `min(100%, calc(60vh * ${(totalW / totalH).toFixed(4)}))`;
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+// ── Rendering: layoutvy ──────────────────────────────────────────────────────
+
+function pieceById(id) { return state.pieces.find(p => p.id === +id); }
+function pieceName(p) { return p.name ? p.name : `Skiva ${p.label}`; }
+function groupTitle(g) { return g.key === '' ? 'Utan tjocklek' : `${g.key} mm`; }
+
+function renderGroupTabs() {
+  const el = document.getElementById('group-tabs');
+  const res = state.result;
+  if (!res || res.groups.length <= 1) { el.innerHTML = ''; return; }
+  el.innerHTML = res.groups.map((g, i) =>
+    `<button class="group-chip${i === state.view.group ? ' active' : ''}" data-i="${i}">
+       ${esc(groupTitle(g))} · ${g.boardsNeeded} skivor
+     </button>`).join('');
+  el.querySelectorAll('.group-chip').forEach(b => {
+    b.addEventListener('click', () => {
+      state.view.group = +b.dataset.i;
+      state.view.pattern = 0;
+      state.view.focus = null;
+      renderOutput();
+    });
+  });
+}
+
+function renderViz() {
+  const body = document.getElementById('viz-body');
+  const head = document.getElementById('viz-head');
+  const note = document.getElementById('focus-note');
+  const res = state.result;
+  body.innerHTML = '';
+
+  if (!res || res.groups.length === 0) {
+    head.style.display = 'none';
+    note.style.display = 'none';
+    body.innerHTML = '<div id="viz-placeholder">Fyll i mått och tryck på <strong>Beräkna</strong> för att se resultatet.</div>';
+    return;
+  }
+
+  const g = res.groups[Math.min(state.view.group, res.groups.length - 1)];
+  if (g.patterns.length === 0) {
+    head.style.display = 'none';
+    note.style.display = 'none';
+    body.innerHTML = '<div id="viz-placeholder">Inga bitar får plats på grundskivan i den här gruppen.</div>';
+    return;
+  }
+
+  const idx = Math.min(state.view.pattern, g.patterns.length - 1);
+  const pat = g.patterns[idx];
+
+  head.style.display = 'flex';
+  document.getElementById('btn-prev').disabled = idx <= 0;
+  document.getElementById('btn-next').disabled = idx >= g.patterns.length - 1;
+  document.getElementById('viz-title').textContent =
+    `Layout ${idx + 1} av ${g.patterns.length}` + (res.groups.length > 1 ? ` · ${groupTitle(g)}` : '');
+
+  const parts = Object.keys(pat.counts).map(id => {
+    const p = pieceById(id);
+    return `${pat.counts[id]} × ${p ? p.label : '?'}`;
+  }).join(', ');
+  const nPieces = pat.placements.length;
+  document.getElementById('viz-meta').innerHTML =
+    `<span class="badge">gäller ${nf(pat.repeats, 0)} ${pat.repeats === 1 ? 'skiva' : 'skivor'}</span>
+     &nbsp; ${nPieces} ${nPieces === 1 ? 'bit' : 'bitar'}/skiva (${esc(parts)})
+     &nbsp;·&nbsp; spill ${nf(pat.wastePercent, 1)} %`;
+
+  if (state.view.focus != null) {
+    const p = pieceById(state.view.focus);
+    const pt = g.perType[state.view.focus];
+    if (p && pt) {
+      note.style.display = 'block';
+      note.innerHTML =
+        `<strong>${esc(p.label)} — ${esc(pieceName(p))}</strong> ${dim(p.h)}×${dim(p.w)} mm:
+         ${pat.counts[p.id] || 0} st på den här layouten ·
+         ${pt.soloPerBoard} st/skiva och ${nf(pt.soloWaste, 1)} % spill om storleken kapas ensam
+         (${pt.soloBoards} skivor för ${nf(pt.requested, 0)} st)
+         <button id="btn-clear-focus">visa alla</button>`;
+      note.querySelector('#btn-clear-focus').addEventListener('click', () => setFocus(null));
+    }
+  } else {
+    note.style.display = 'none';
+  }
+
+  body.appendChild(renderPattern(pat, g.board, state.opts, state.view.focus));
+}
+
+function setFocus(pieceId) {
+  const res = state.result;
+  if (!res) return;
+
+  if (pieceId == null || state.view.focus === pieceId) {
+    state.view.focus = null;
+    renderOutput();
+    return;
+  }
+
+  state.view.focus = pieceId;
+  for (let gi = 0; gi < res.groups.length; gi++) {
+    const g = res.groups[gi];
+    if (!g.perType[pieceId]) continue;
+    state.view.group = gi;
+    const pi = g.patterns.findIndex(pat => (pat.counts[pieceId] || 0) > 0);
+    state.view.pattern = pi >= 0 ? pi : 0;
+    break;
+  }
+  state.view.tab = 'layout';
+  setTab('layout');
+  renderOutput();
+}
+
+// ── Rendering: sammanfattning ────────────────────────────────────────────────
+
+function renderSummary() {
+  const el = document.getElementById('summary');
+  const res = state.result;
+  if (!res) { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+
+  const showT = res.anyThickness;
+  const blocks = res.groups.map(g => {
+    const rows = g.pieces.map(p => {
+      const pt = g.perType[p.id];
+      const cls = pt.tooLarge ? ' class="too-large"' : (state.view.focus === p.id ? ' class="selected"' : '');
+      if (pt.tooLarge) {
+        return `<tr${cls} data-piece="${p.id}">
+          <td><span class="piece-label" style="background:${pieceColor(p.idx)}">${p.label}</span></td>
+          <td>${esc(pieceName(p))}</td>
+          <td>${dim(p.h)} × ${dim(p.w)}</td>
+          ${showT ? `<td>${p.t === '' ? '–' : esc(p.t)}</td>` : ''}
+          <td>${nf(pt.requested, 0)}</td>
+          <td colspan="4">&#9888; För stor för grundskivan</td>
+        </tr>`;
+      }
+      return `<tr${cls} data-piece="${p.id}">
+        <td><span class="piece-label" style="background:${pieceColor(p.idx)}">${p.label}</span></td>
+        <td>${esc(pieceName(p))}</td>
+        <td>${dim(p.h)} × ${dim(p.w)}</td>
+        ${showT ? `<td>${p.t === '' ? '–' : esc(p.t)}</td>` : ''}
+        <td>${nf(pt.requested, 0)}</td>
+        <td>${m2(p.w * p.h, 3)}</td>
+        <td>${m2(pt.placed * p.w * p.h, 2)}</td>
+        <td>${pt.soloPerBoard}</td>
+        <td>${nf(pt.soloWaste, 1)} %</td>
+      </tr>`;
+    }).join('');
+
+    const layoutList = g.patterns.map((pat, i) =>
+      `<li><a href="#" data-g="${res.groups.indexOf(g)}" data-p="${i}">Layout ${i + 1}</a>: ${nf(pat.repeats, 0)} ${pat.repeats === 1 ? 'skiva' : 'skivor'} à ${pat.placements.length} st · spill ${nf(pat.wastePercent, 1)} %</li>`
+    ).join('');
+
+    return `<div class="group-block">
+      <div class="group-head">
+        <h3>${esc(groupTitle(g))}</h3>
+        <span class="meta">Grundskiva ${dim(g.board.h)} × ${dim(g.board.w)} mm (${m2(g.boardArea, 3)} m²)
+          &nbsp;·&nbsp; <strong>${nf(g.boardsNeeded, 0)}</strong> skivor
+          &nbsp;·&nbsp; spill ${nf(g.wastePercent, 1)} % (${m2(g.wasteArea, 1)} m²)</span>
+      </div>
+      ${g.hitCap ? '<div class="warn">Mönstergränsen nåddes — resultatet kan vara ofullständigt.</div>' : ''}
+      ${Object.keys(g.unplaced).length ? '<div class="warn">Alla bitar fick inte plats. Kontrollera måtten.</div>' : ''}
+      <table class="sum-table">
+        <thead><tr>
+          <th></th><th>Benämning</th><th>Mått (L×B)</th>
+          ${showT ? '<th>Tjocklek</th>' : ''}
+          <th>Antal</th><th>m²/st</th><th>Total m²</th><th>St/skiva*</th><th>Spill*</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="hint">* vid kapning av enbart den storleken. Klicka på en rad för att se var den hamnar.</div>
+      <div class="hint" style="margin-top:6px"><strong>Kapningar:</strong><ul style="margin-left:18px">${layoutList}</ul></div>
+    </div>`;
+  }).join('');
+
+  const t = res.totals;
+  el.innerHTML = `
+    <div class="sum-title">Sammanfattning</div>
+    ${blocks}
+    <div class="totals">
+      Totalt behövs <span class="boards-count">${nf(t.boards, 0)}</span> grundskivor
+      &nbsp;·&nbsp; <strong>${m2(t.boardArea, 2)} m²</strong> material<br>
+      Kapad yta: <strong>${m2(t.placedArea, 2)} m²</strong>
+      &nbsp;·&nbsp; Spill: <strong>${m2(t.wasteArea, 2)} m² (${nf(t.wastePercent, 1)} %)</strong>
+    </div>`;
+
+  el.querySelectorAll('tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => setFocus(+tr.dataset.piece));
+  });
+  el.querySelectorAll('.hint a').forEach(a => {
+    a.addEventListener('click', ev => {
+      ev.preventDefault();
+      state.view.group = +a.dataset.g;
+      state.view.pattern = +a.dataset.p;
+      renderOutput();
+      document.getElementById('viz-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  });
+}
+
+// ── Textsammanfattning ───────────────────────────────────────────────────────
+
+function textTable(headers, rows, rightAlign) {
+  const widths = headers.map((h, i) =>
+    Math.max(h.length, ...rows.map(r => String(r[i]).length)));
+  const line = cells => '  ' + cells.map((c, i) =>
+    rightAlign[i] ? String(c).padStart(widths[i]) : String(c).padEnd(widths[i])
+  ).join('  ').replace(/\s+$/, '');
+  return [line(headers), '  ' + widths.map(w => '─'.repeat(w)).join('  ')]
+    .concat(rows.map(line));
+}
+
+function buildText() {
+  const res = state.result;
+  if (!res) return '';
+  const L = [];
+  const showT = res.anyThickness;
+
+  L.push('SKIVOPTIMERING');
+  L.push(new Date().toLocaleDateString('sv-SE'));
+  L.push('');
+
+  L.push('GRUNDSKIVOR');
+  state.boards.forEach(b => {
+    L.push(`  ${dim(b.h)} × ${dim(b.w)} mm` +
+      (b.t !== '' ? ` · ${b.t} mm tjock` : '') +
+      `  (${m2(b.h * b.w, 3)} m²/st)`);
+  });
+  L.push('');
+
+  L.push('INSTÄLLNINGAR');
+  L.push(`  Sågsnitt:  ${state.opts.kerf > 0 ? nf(state.opts.kerf, 1) + ' mm per snitt' : 'räknas ej'}`);
+  L.push(`  Rotation:  ${state.opts.rotation ? 'tillåten' : 'ej tillåten (ådringen bevaras)'}`);
+  L.push(`  Blandning: ${state.opts.mix ? 'olika storlekar får dela skiva' : 'en storlek per skiva'}`);
+  L.push('');
+
+  res.groups.forEach(g => {
+    L.push('─'.repeat(72));
+    L.push(showT ? `MATERIAL: ${groupTitle(g).toUpperCase()}` : 'KAPLISTA');
+    L.push(`Grundskiva ${dim(g.board.h)} × ${dim(g.board.w)} mm (${m2(g.boardArea, 3)} m²)`);
+    L.push('');
+
+    const headers = ['', 'Benämning', 'Mått (L×B)'].concat(showT ? ['Tjocklek'] : [])
+      .concat(['Antal', 'm²/st', 'Total m²', 'St/skiva*', 'Spill*']);
+    const right = [false, false, false].concat(showT ? [true] : [])
+      .concat([true, true, true, true, true]);
+    const rows = g.pieces.map(p => {
+      const pt = g.perType[p.id];
+      const base = [p.label, pieceName(p), `${dim(p.h)} × ${dim(p.w)}`];
+      if (showT) base.push(p.t === '' ? '–' : p.t + ' mm');
+      if (pt.tooLarge) return base.concat([nf(pt.requested, 0), m2(p.w * p.h, 3), 'FÖR STOR', '–', '–']);
+      return base.concat([
+        nf(pt.requested, 0), m2(p.w * p.h, 3), m2(pt.placed * p.w * p.h, 2),
+        String(pt.soloPerBoard), nf(pt.soloWaste, 1) + ' %'
+      ]);
+    });
+    textTable(headers, rows, right).forEach(l => L.push(l));
+    L.push('  * vid kapning av enbart den storleken');
+    L.push('');
+
+    L.push('  Kapningar:');
+    g.patterns.forEach((pat, i) => {
+      const parts = Object.keys(pat.counts).map(id => {
+        const p = pieceById(id);
+        return `${pat.counts[id]} × ${p ? p.label : '?'}`;
+      }).join(' + ');
+      L.push(`    Layout ${i + 1}: ${nf(pat.repeats, 0)} ${pat.repeats === 1 ? 'skiva' : 'skivor'} à ${parts}` +
+             `  ·  spill ${nf(pat.wastePercent, 1)} %`);
+    });
+    L.push('');
+
+    L.push(`  Grundskivor:  ${nf(g.boardsNeeded, 0)} st   (${m2(g.totalBoardArea, 2)} m²)`);
+    L.push(`  Kapad yta:    ${m2(g.placedArea, 2)} m²`);
+    L.push(`  Spill:        ${m2(g.wasteArea, 2)} m²   (${nf(g.wastePercent, 1)} %)`);
+    L.push('');
+  });
+
+  const t = res.totals;
+  L.push('═'.repeat(72));
+  L.push('TOTALT');
+  if (res.groups.length > 1) {
+    res.groups.forEach(g => {
+      L.push(`  ${groupTitle(g).padEnd(16)} ${nf(g.boardsNeeded, 0)} grundskivor` +
+        `  (${dim(g.board.h)} × ${dim(g.board.w)} mm)`);
+    });
+  }
+  L.push(`  Grundskivor totalt:  ${nf(t.boards, 0)} st   (${m2(t.boardArea, 2)} m²)`);
+  L.push(`  Kapad yta:           ${m2(t.placedArea, 2)} m²`);
+  L.push(`  Spill:               ${m2(t.wasteArea, 2)} m²   (${nf(t.wastePercent, 1)} %)`);
+
+  return L.join('\n');
+}
+
+function renderText() {
+  document.getElementById('text-output').textContent = buildText() || 'Tryck på Beräkna för att få en textsammanfattning.';
+}
+
+// ── Orkestrering ─────────────────────────────────────────────────────────────
+
+function renderOutput() {
+  renderGroupTabs();
+  renderViz();
+  renderSummary();
+  renderText();
+}
+
+function runCalculation() {
+  readForm();
+  const errors = validate();
+  showErrors(errors);
+  if (errors.length > 0) return;
+
+  state.result = compute();
+  state.view.group = 0;
+  state.view.pattern = 0;
+  state.view.focus = null;
+  renderOutput();
+}
+
+function setTab(name) {
+  state.view.tab = name;
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  document.getElementById('panel-layout').classList.toggle('active', name === 'layout');
+  document.getElementById('panel-text').classList.toggle('active', name === 'text');
+}
+
+// ── Händelser ────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-add-board').addEventListener('click', () => addBoardRow());
+document.getElementById('btn-add-piece').addEventListener('click', () => addPieceRow());
+document.getElementById('btn-calculate').addEventListener('click', runCalculation);
+
+document.getElementById('kerf-enabled').addEventListener('change', function () {
+  document.getElementById('kerf-detail').style.display = this.checked ? 'flex' : 'none';
+});
+
+document.querySelectorAll('.tab').forEach(b => {
+  b.addEventListener('click', () => setTab(b.dataset.tab));
+});
+
+document.getElementById('btn-prev').addEventListener('click', () => {
+  if (state.view.pattern > 0) { state.view.pattern--; renderOutput(); }
+});
+document.getElementById('btn-next').addEventListener('click', () => {
+  const g = state.result && state.result.groups[state.view.group];
+  if (g && state.view.pattern < g.patterns.length - 1) { state.view.pattern++; renderOutput(); }
+});
+
+document.getElementById('btn-copy').addEventListener('click', async () => {
+  const text = document.getElementById('text-output').textContent;
+  const status = document.getElementById('copy-status');
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+  status.textContent = 'Kopierat!';
+  setTimeout(() => { status.textContent = ''; }, 2000);
+});
+
+document.getElementById('btn-download').addEventListener('click', () => {
+  const blob = new Blob([document.getElementById('text-output').textContent], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `skivoptimering-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+addBoardRow();
+addPieceRow();
+addPieceRow();
+
+// Testkrok
+window.__skiv = { state, run: runCalculation, addBoardRow, addPieceRow, buildText };
+</script>
+</body>
+</html>
